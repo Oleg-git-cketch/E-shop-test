@@ -3,7 +3,7 @@ import database as db
 import buttons as bt
 
 
-bot = telebot.TeleBot('7952352811:AAEqgtz9v94gFEWoFnLHiTEZYGI2Q7AJylQ')
+bot = telebot.TeleBot('7864673375:AAH8j0tC81QfaM36DcOG-j9r5Wgyr9Mo16I')
 admins = {}
 users = {}
 
