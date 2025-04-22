@@ -3,8 +3,7 @@ import database as db
 import buttons as bt
 
 
-bot = telebot.TeleBot('your_token')
-admin_id = 'your_telegram_id'
+bot = telebot.TeleBot('7952352811:AAEqgtz9v94gFEWoFnLHiTEZYGI2Q7AJylQ')
 admins = {}
 users = {}
 
@@ -92,12 +91,11 @@ def get_user_location(message, text):
     user_id = message.from_user.id
     if message.location:
         text += f'Клиент @{message.from_user.username}'
-        bot.send_message(admin_id, text)
-        bot.send_location(admin_id, latitude=message.location.latitude, longitude=message.location.longitude)
-        db.make_order(user_id)
-        db.clear_cart(user_id)
+        # Здесь можешь отправить всем админам или в канал
         bot.send_message(user_id, 'Ваш заказ оформлен! Скоро с вами свяжутся специалисты!',
                          reply_markup=telebot.types.ReplyKeyboardRemove())
+        db.make_order(user_id)
+        db.clear_cart(user_id)
         bot.send_message(user_id, 'Выберите пункт меню:', reply_markup=bt.main_menu(db.get_pr_buttons()))
     else:
         bot.send_message(user_id, 'Отправьте локацию по кнопке!')
@@ -134,117 +132,88 @@ def choose_pr_count(call):
 ## Админ панель ##
 @bot.message_handler(commands=['admin'])
 def start_admin(message):
-    if message.from_user.id == admin_id:
-        bot.send_message(admin_id, 'Добро пожаловать в админ-панель!',
-                         reply_markup=bt.admin_menu())
-        # Переход на этап выбора
-        bot.register_next_step_handler(message, admin_choice)
-    else:
-        bot.send_message(message.from_user.id, 'Вы не администратор!')
+    bot.send_message(message.chat.id, 'Добро пожаловать в админ-панель!',
+                     reply_markup=bt.admin_menu())
+    bot.register_next_step_handler(message, admin_choice)
 
 
 def admin_choice(message):
+    chat_id = message.chat.id
     if message.text == 'Добавить продукт':
-        bot.send_message(admin_id, 'Начнем добавления продукта\n'
+        bot.send_message(chat_id, 'Начнем добавления продукта\n'
                                    'Введите название, описание, цену, количество и фото товара через запятую\n'
                                    'Пример:\n'
                                    'Картошка, Классный клубень, 4999.99, 1000, https://kartoshka.jpg\n\n'
                                    'Для отправки фотографии, воспользуйтесь https://postimages.org/, '
-                                   'загрузите фото товара и впишите прямую на нее ссылку',
-                         reply_markup=telebot.types.ReplyKeyboardRemove())
+                                   'загрузите фото товара и впишите прямую на нее ссылку')
         bot.register_next_step_handler(message, get_product)
     elif message.text == 'Удалить продукт':
         if db.check_pr():
             products = db.get_all_pr()
-            bot.send_message(admin_id, 'Выберите товар для удаления',
+            bot.send_message(chat_id, 'Выберите товар для удаления',
                              reply_markup=bt.admin_pr(products))
             bot.register_next_step_handler(message, get_product_to_del)
         else:
-            bot.send_message(admin_id, 'Товаров в базе нет!')
+            bot.send_message(chat_id, 'Товаров в базе нет!')
             bot.register_next_step_handler(message, admin_choice)
     elif message.text == 'Изменить продукт':
         if db.check_pr():
             products = db.get_all_pr()
-            bot.send_message(admin_id, 'Выберите товар для изменения',
+            bot.send_message(chat_id, 'Выберите товар для изменения',
                              reply_markup=bt.admin_pr(products))
             bot.register_next_step_handler(message, get_product_to_chng)
         else:
-            bot.send_message(admin_id, 'Товаров в базе нет!')
+            bot.send_message(chat_id, 'Товаров в базе нет!')
             bot.register_next_step_handler(message, admin_choice)
     elif message.text == 'Перейти в главное меню':
         products = db.get_pr_buttons()
-        bot.send_message(admin_id, 'Перенаправляю вас обратно в меню',
+        bot.send_message(chat_id, 'Перенаправляю вас обратно в меню',
                          reply_markup=telebot.types.ReplyKeyboardRemove())
-        bot.send_message(admin_id, 'Выберите пункт меню:',
+        bot.send_message(chat_id, 'Выберите пункт меню:',
                          reply_markup=bt.main_menu(products))
 
 
 def get_product(message):
     pr_attrs = message.text.split(', ')
     db.pr_to_db(pr_attrs[0], pr_attrs[1], pr_attrs[2], pr_attrs[3], pr_attrs[4])
-    bot.send_message(admin_id, f'Продукт {pr_attrs[0]} успешно добавлен! Что-то ещё?',
+    bot.send_message(message.chat.id, f'Продукт {pr_attrs[0]} успешно добавлен!',
                      reply_markup=bt.admin_menu())
     bot.register_next_step_handler(message, admin_choice)
 
 
 def get_product_to_del(message):
     pr_to_del = message.text
-    bot.send_message(admin_id, 'Вы уверены?', reply_markup=bt.confirm_buttons())
+    bot.send_message(message.chat.id, 'Вы уверены?', reply_markup=bt.confirm_buttons())
     bot.register_next_step_handler(message, confirm_delete, pr_to_del)
 
 
 def get_product_to_chng(message):
     admins[message.from_user.id] = message.text
-    bot.send_message(admin_id, 'Какой аттрибут вы хотите изменить?',
+    bot.send_message(message.chat.id, 'Какой аттрибут вы хотите изменить?',
                      reply_markup=bt.change_buttons())
 
 
 @bot.callback_query_handler(lambda call: call.data in ['name', 'description', 'price', 'count', 'photo'])
 def change_attr(call):
-    if call.data == 'name':
-        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(admin_id, 'Введите новое название товара')
-        attr = call.data
-        bot.register_next_step_handler(call, confirm_change, attr)
-    elif call.data == 'description':
-        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(admin_id, 'Введите новое описание товара')
-        attr = call.data
-        bot.register_next_step_handler(call, confirm_change, attr)
-    elif call.data == 'price':
-        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(admin_id, 'Введите новую цену товара')
-        attr = call.data
-        bot.register_next_step_handler(call, confirm_change, attr)
-    elif call.data == 'count':
-        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(admin_id, 'Введите кол-во прибытия товара')
-        attr = call.data
-        bot.register_next_step_handler(call, confirm_change, attr)
-    elif call.data == 'photo':
-        bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
-        bot.send_message(admin_id, 'Введите новую ссылку товара')
-        attr = call.data
-        bot.register_next_step_handler(call, confirm_change, attr)
+    attr = call.data
+    bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id)
+    bot.send_message(call.message.chat.id, f'Введите новое значение для {attr}')
+    bot.register_next_step_handler(call.message, confirm_change, attr)
 
 
 def confirm_change(message, attr):
-    bot.send_message(admin_id, 'Вы уверены?',
-                     reply_markup=bt.confirm_buttons())
     new_value = message.text
+    bot.send_message(message.chat.id, 'Вы уверены?', reply_markup=bt.confirm_buttons())
     bot.register_next_step_handler(message, confirm_change_attr, attr, new_value)
 
 
 def confirm_delete(message, pr_to_del):
     if message.text == 'Да':
         db.del_product(pr_to_del)
-        bot.send_message(admin_id, 'Товар успешно удален!', reply_markup=bt.admin_menu())
-        # Переход на этап выбора
-        bot.register_next_step_handler(message, admin_choice)
-    elif message.text == 'Нет':
-        bot.send_message(admin_id, 'Возвращаю вас обратно', reply_markup=bt.admin_menu())
-        # Переход на этап выбора
-        bot.register_next_step_handler(message, admin_choice)
+        bot.send_message(message.chat.id, 'Товар успешно удален!', reply_markup=bt.admin_menu())
+    else:
+        bot.send_message(message.chat.id, 'Отмена удаления.', reply_markup=bt.admin_menu())
+    bot.register_next_step_handler(message, admin_choice)
 
 
 def confirm_change_attr(message, attr, new_value):
@@ -253,13 +222,10 @@ def confirm_change_attr(message, attr, new_value):
             db.change_pr_attr(admins[message.from_user.id], float(new_value), attr)
         else:
             db.change_pr_attr(admins[message.from_user.id], new_value, attr)
-        bot.send_message(admin_id, 'Изменение прошло успешно!', reply_markup=bt.admin_menu())
-        # Переход на этап выбора
-        bot.register_next_step_handler(message, admin_choice)
-    elif message.text == 'Нет':
-        bot.send_message(admin_id, 'Возвращаю вас обратно', reply_markup=bt.admin_menu())
-        # Переход на этап выбора
-        bot.register_next_step_handler(message, admin_choice)
+        bot.send_message(message.chat.id, 'Изменения сохранены!', reply_markup=bt.admin_menu())
+    else:
+        bot.send_message(message.chat.id, 'Изменения отменены.', reply_markup=bt.admin_menu())
+    bot.register_next_step_handler(message, admin_choice)
 
 
-bot.polling()
+bot.infinity_polling()
